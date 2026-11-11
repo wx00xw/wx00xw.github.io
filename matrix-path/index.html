@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>행렬 경로 문제 시뮬레이션 — 동적 계획</title>
+<style>
+  :root{
+    --bg:#f6f7fb; --card:#fff; --ink:#1f2433; --muted:#6b7285; --line:#d9dce6;
+    --cur:#ffe58a; --cand:#3b7ddd; --pick:#1a9e5c; --path:#bfeccf; --pathInk:#0e6b3c;
+    --bd:#eef0f5; --warn:#d6453d; --cnt:#d9822b;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:"Pretendard","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;background:var(--bg);color:var(--ink);line-height:1.55}
+  header{background:#22304f;color:#fff;padding:18px 24px}
+  header h1{margin:0;font-size:22px}
+  header p{margin:4px 0 0;color:#c9d3ea;font-size:14px}
+  main{max-width:1180px;margin:0 auto;padding:18px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin-bottom:16px}
+  .card h2{margin:0 0 10px;font-size:17px}
+  .problem ul{margin:6px 0 0;padding-left:20px}
+  .controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+  .controls .grp{display:flex;gap:6px;align-items:center;padding-right:10px;margin-right:4px;border-right:1px solid var(--line)}
+  .controls .grp:last-child{border-right:none}
+  button,select{font:inherit;font-size:14px;padding:6px 12px;border:1px solid var(--line);border-radius:8px;background:#fff;cursor:pointer}
+  button:hover{background:#f0f3fa}
+  button.primary{background:#2f6fde;color:#fff;border-color:#2f6fde}
+  button.primary:hover{background:#2560c4}
+  button:disabled{opacity:.45;cursor:default}
+  label{font-size:14px;user-select:none}
+  .boards{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media (max-width:860px){.boards{grid-template-columns:1fr}}
+  .board{display:flex;flex-direction:column;align-items:center}
+  .board h3{margin:0 0 8px;font-size:16px}
+  .board .sub{font-size:13px;color:var(--muted);margin:-4px 0 8px;text-align:center}
+  table.grid{border-collapse:separate;border-spacing:4px}
+  table.grid th{font-size:12px;color:var(--muted);font-weight:normal;width:26px}
+  table.grid td{width:58px;height:52px;text-align:center;vertical-align:middle;border:2px solid var(--line);border-radius:8px;font-size:18px;font-weight:600;position:relative;background:#fff;transition:background .2s,border-color .2s}
+  table.grid td input.mi{width:48px;height:38px;text-align:center;font:inherit;font-size:18px;font-weight:600;border:none;background:transparent;color:inherit}
+  table.grid td input.mi:focus{outline:2px solid var(--cand);border-radius:6px}
+  td.bd{background:var(--bd);color:var(--muted);font-weight:500}
+  td.empty{color:transparent}
+  td.cur{background:var(--cur);border-color:#e0b400}
+  td.cand{border:2px dashed var(--cand)}
+  td.pick{border:3px solid var(--pick)}
+  td.path{background:var(--path);color:var(--pathInk);border-color:var(--pick)}
+  td.trace{box-shadow:0 0 0 3px var(--pick) inset}
+  td .arr{position:absolute;font-size:11px;color:var(--muted);font-weight:500}
+  td .arr.up{top:1px;left:50%;transform:translateX(-50%)}
+  td .arr.left{left:3px;top:50%;transform:translateY(-50%)}
+  td .cnt{position:absolute;right:3px;bottom:1px;font-size:11px;color:var(--cnt);font-weight:700}
+  td input.ans{width:50px;height:36px;font:inherit;font-size:17px;text-align:center;border:2px solid #e0b400;border-radius:6px}
+  .explain{font-size:16px;min-height:72px}
+  .explain .formula{font-family:Consolas,"D2Coding",monospace;background:#f3f5fa;border-radius:8px;padding:8px 12px;margin-top:6px;display:inline-block;font-size:16px}
+  .explain .bad{color:var(--warn);font-weight:600}
+  .explain .good{color:var(--pick);font-weight:600}
+  .steprow{display:flex;justify-content:space-between;align-items:center;font-size:13px;color:var(--muted);margin-bottom:6px}
+  .bar{height:6px;background:#e7eaf2;border-radius:3px;overflow:hidden;margin-bottom:10px}
+  .bar>div{height:100%;background:#2f6fde;width:0;transition:width .2s}
+  .lower{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media (max-width:860px){.lower{grid-template-columns:1fr}}
+  pre.code{margin:0;font-family:Consolas,"D2Coding",monospace;font-size:14px;line-height:1.7}
+  pre.code span{display:block;padding:0 8px;border-radius:4px}
+  pre.code span.hl{background:var(--cur)}
+  pre.code .cm{color:var(--muted)}
+  table.cmp{border-collapse:collapse;font-size:14px;margin-top:8px}
+  table.cmp th,table.cmp td{border:1px solid var(--line);padding:4px 10px;text-align:right}
+  table.cmp th{background:#f3f5fa}
+  table.cmp tr.now td{background:#fff6d6;font-weight:700}
+  .legend{display:flex;flex-wrap:wrap;gap:14px;font-size:13px;color:var(--muted);margin-top:8px;justify-content:center}
+  .legend i{display:inline-block;width:14px;height:14px;border-radius:3px;vertical-align:-2px;margin-right:4px;border:2px solid var(--line)}
+  .note{font-size:13px;color:var(--muted)}
+  footer{text-align:center;font-size:12px;color:var(--muted);padding:10px 0 24px}
+</style>
+</head>
+<body>
+<header>
+  <h1>행렬 경로 문제 — 동적 계획(DP) 시뮬레이션</h1>
+  <p>c 표가 한 칸씩 채워지는 과정과, 표를 거꾸로 따라가 최적 경로를 찾는 과정을 단계별로 봅니다.</p>
+</header>
+<main>
+
+<section class="card problem">
+  <h2>문제</h2>
+  양수 원소로 된 n×n 행렬의 왼쪽 위 (1,1)에서 출발해 오른쪽 아래 (n,n)까지 갑니다.
+  <ul>
+    <li>오른쪽이나 아래쪽으로만 움직일 수 있습니다. 왼쪽·위쪽·대각선 이동은 안 됩니다.</li>
+    <li>목표: 지나간 칸의 수를 모두 더한 값이 <b>가장 크게</b> 되는 경로를 찾습니다.</li>
+    <li>c[i, j] = (1,1)에서 (i, j)까지 오는 경로들 중 최고 점수 → <b>c[i, j] = m<sub>ij</sub> + max(c[i-1, j], c[i, j-1])</b></li>
+  </ul>
+</section>
+
+<section class="card">
+  <div class="controls">
+    <div class="grp">
+      <label>크기
+        <select id="size">
+          <option>3</option><option selected>4</option><option>5</option><option>6</option><option>7</option>
+        </select>
+      </label>
+      <button id="btnLecture" title="강의자료 예제 행렬">강의 예제</button>
+      <button id="btnRandom">무작위 행렬</button>
+    </div>
+    <div class="grp">
+      <button id="btnReset" title="처음으로 (Home)">⏮ 처음</button>
+      <button id="btnPrev" title="한 단계 뒤로 (←)">◀ 이전</button>
+      <button id="btnNext" class="primary" title="한 단계 앞으로 (→)">다음 ▶</button>
+      <button id="btnPlay" title="자동 재생 (Space)">▶ 자동</button>
+      <button id="btnEnd" title="끝까지 (End)">끝 ⏭</button>
+    </div>
+    <div class="grp">
+      <label>속도 <input id="speed" type="range" min="150" max="1800" step="50" value="800" style="width:100px;direction:rtl"></label>
+    </div>
+    <div class="grp">
+      <label><input type="checkbox" id="quiz"> 직접 계산해 보기</label>
+      <label><input type="checkbox" id="showArrow" checked> 화살표</label>
+      <label><input type="checkbox" id="showCnt"> 재귀 호출 횟수</label>
+    </div>
+  </div>
+  <p class="note" style="margin:8px 0 0">왼쪽 행렬의 숫자는 눌러서 바꿀 수 있습니다(1~99). 키보드: ← → 이동, Space 자동 재생.
+  «직접 계산해 보기»를 켜면 다음 칸의 c 값을 먼저 입력해야 넘어갑니다.</p>
+</section>
+
+<section class="boards">
+  <div class="card board">
+    <h3>입력 행렬 m</h3>
+    <div class="sub">지나간 칸의 수를 더합니다</div>
+    <table class="grid" id="tblM"></table>
+  </div>
+  <div class="card board">
+    <h3>DP 표 c</h3>
+    <div class="sub">0행·0열은 행렬 밖(경계), 값은 0</div>
+    <table class="grid" id="tblC"></table>
+    <div class="legend">
+      <span><i style="background:var(--cur);border-color:#e0b400"></i>지금 채우는 칸</span>
+      <span><i style="border:2px dashed var(--cand)"></i>비교하는 두 칸</span>
+      <span><i style="border:3px solid var(--pick)"></i>더 큰 쪽</span>
+      <span><i style="background:var(--path);border-color:var(--pick)"></i>최적 경로</span>
+    </div>
+  </div>
+</section>
+
+<section class="card">
+  <div class="steprow"><span id="stepLabel"></span><span id="phaseLabel"></span></div>
+  <div class="bar"><div id="barFill"></div></div>
+  <div class="explain" id="explain"></div>
+</section>
+
+<section class="lower">
+  <div class="card">
+    <h2>DP 알고리즘 (지금 실행 중인 줄)</h2>
+<pre class="code" id="code"><span data-l="0">matrixPath(n)   <span class="cm" style="display:inline">▷ (n, n)에 이르는 최고점수</span></span><span data-l="0b">{</span><span data-l="1">  for i ← 0 to n</span><span data-l="2">      c[i, 0] ← 0;</span><span data-l="3">  for j ← 1 to n</span><span data-l="4">      c[0, j] ← 0;</span><span data-l="5">  for i ← 1 to n</span><span data-l="6">      for j ← 1 to n</span><span data-l="7">          c[i, j] ← m<sub>ij</sub> + max(c[i-1, j], c[i, j-1]);</span><span data-l="8">  return c[n, n];</span><span data-l="8b">}</span></pre>
+    <p class="note">마지막의 «경로 되짚기»는 위 코드에는 없는 추가 단계입니다. 최고 점수만이 아니라 실제 경로도 알고 싶을 때, c[n, n]에서 위·왼쪽 중 더 큰 칸을 따라 (1, 1)까지 거꾸로 갑니다.</p>
+  </div>
+  <div class="card">
+    <h2>재귀로 풀면 몇 번 호출할까?</h2>
+<pre class="code"><span>matrixPath(i, j)</span><span>{</span><span>  if (i = 0 or j = 0) then return 0;</span><span>  else return m<sub>ij</sub> + max(matrixPath(i-1, j), matrixPath(i, j-1));</span><span>}</span></pre>
+    <p id="recText" style="margin:10px 0 4px"></p>
+    <table class="cmp" id="cmpTbl"></table>
+    <p class="note">«재귀 호출 횟수»를 켜면 c 표 각 칸 오른쪽 아래에, 재귀 알고리즘이 그 칸을 몇 번 다시 계산하는지 주황색으로 보여 줍니다. DP는 모든 칸을 한 번씩만 계산합니다.</p>
+  </div>
+</section>
+
+<footer>예제 행렬: 알고리즘 강의자료 5장 «동적 계획 알고리즘» 행렬 경로 문제 · 서버 없이 이 파일 하나로 동작합니다</footer>
+</main>
+
+<script>
+(function(){
+  const LECTURE = [[6,7,12,5],[5,3,11,18],[7,17,3,3],[8,10,14,9]];
+  let n = 4;
+  let M = LECTURE.map(r => r.slice());
+  let C, from, steps, path, fillIndex, callCnt;
+  let k = 0;            // 현재 단계
+  let timer = null;
+  let pending = false;  // 직접 계산 모드에서 입력 대기 중
+  let feedback = "";
+
+  const $ = id => document.getElementById(id);
+  const tblM = $("tblM"), tblC = $("tblC");
+
+  function compute(){
+    C = Array.from({length:n+1}, () => Array(n+1).fill(0));
+    from = Array.from({length:n+1}, () => Array(n+1).fill(null));
+    for (let i=1;i<=n;i++) for (let j=1;j<=n;j++){
+      const up = C[i-1][j], left = C[i][j-1];
+      C[i][j] = M[i-1][j-1] + Math.max(up, left);
+      from[i][j] = up > left ? "up" : left > up ? "left" : "tie";
+    }
+    // 경로 되짚기 (같으면 위쪽을 우선)
+    path = [];
+    let i = n, j = n;
+    while (true){
+      path.push([i,j]);
+      if (i === 1 && j === 1) break;
+      if (i === 1) j--; else if (j === 1) i--;
+      else if (C[i-1][j] >= C[i][j-1]) i--; else j--;
+    }
+    // 단계 목록
+    steps = [{t:"start"},{t:"boundary"}];
+    fillIndex = {};
+    for (let a=1;a<=n;a++) for (let b=1;b<=n;b++){ fillIndex[a+","+b] = steps.length; steps.push({t:"fill",i:a,j:b}); }
+    for (let p=0;p<path.length;p++) steps.push({t:"trace",p});
+    steps.push({t:"done"});
+    // 재귀 알고리즘의 칸별 호출 횟수
+    callCnt = Array.from({length:n+1}, () => Array(n+1).fill(0));
+    callCnt[n][n] = 1;
+    for (let a=n;a>=0;a--) for (let b=n;b>=0;b--){
+      if (a>0 && b>0 && callCnt[a][b]){ callCnt[a-1][b] += callCnt[a][b]; callCnt[a][b-1] += callCnt[a][b]; }
+    }
+  }
+
+  function totalCalls(sz){
+    const T = Array.from({length:sz+1}, () => Array(sz+1).fill(1));
+    for (let a=1;a<=sz;a++) for (let b=1;b<=sz;b++) T[a][b] = 1 + T[a-1][b] + T[a][b-1];
+    return T[sz][sz];
+  }
+
+  function buildTables(){
+    // m 표
+    let h = "<tr><th></th>";
+    for (let j=1;j<=n;j++) h += "<th>"+j+"</th>";
+    h += "</tr>";
+    for (let i=1;i<=n;i++){
+      h += "<tr><th>"+i+"</th>";
+      for (let j=1;j<=n;j++) h += '<td id="m'+i+'_'+j+'"><input class="mi" data-i="'+i+'" data-j="'+j+'" value="'+M[i-1][j-1]+'" inputmode="numeric" aria-label="m '+i+','+j+'"></td>';
+      h += "</tr>";
+    }
+    tblM.innerHTML = h;
+    tblM.querySelectorAll("input.mi").forEach(inp => {
+      inp.addEventListener("change", () => {
+        let v = parseInt(inp.value, 10);
+        if (isNaN(v) || v < 1) v = 1; if (v > 99) v = 99;
+        inp.value = v;
+        M[+inp.dataset.i-1][+inp.dataset.j-1] = v;
+        restart(false);
+      });
+    });
+    // c 표
+    h = "<tr><th></th>";
+    for (let j=0;j<=n;j++) h += "<th>"+j+"</th>";
+    h += "</tr>";
+    for (let i=0;i<=n;i++){
+      h += "<tr><th>"+i+"</th>";
+      for (let j=0;j<=n;j++) h += '<td id="c'+i+'_'+j+'"></td>';
+      h += "</tr>";
+    }
+    tblC.innerHTML = h;
+  }
+
+  function cellC(i,j){ return $("c"+i+"_"+j); }
+  function cellM(i,j){ return $("m"+i+"_"+j); }
+
+  function render(){
+    const st = steps[k];
+    const showArrow = $("showArrow").checked, showCnt = $("showCnt").checked;
+    const traced = new Set();
+    if (st.t === "trace" || st.t === "done"){
+      const upto = st.t === "done" ? path.length-1 : st.p;
+      for (let p=0;p<=upto;p++) traced.add(path[p].join(","));
+    }
+    // c 표
+    for (let i=0;i<=n;i++) for (let j=0;j<=n;j++){
+      const td = cellC(i,j);
+      td.className = "";
+      let html = "";
+      const isBd = (i===0 || j===0);
+      if (isBd){
+        td.classList.add("bd");
+        if (k >= 1 && !(i===0 && j===0) ) html = "0";
+        else if (k >= 1 && i===0 && j===0) html = "0";
+      } else {
+        const filled = fillIndex[i+","+j] <= k;
+        if (filled){
+          html = String(C[i][j]);
+          if (showArrow && !(i===1 && j===1)){
+            const f = from[i][j];
+            if (f==="up"||f==="tie") html += '<span class="arr up">↓</span>';
+            if (f==="left"||f==="tie") html += '<span class="arr left">→</span>';
+          }
+        }
+        if (traced.has(i+","+j)) td.classList.add("path");
+      }
+      if (showCnt && callCnt[i][j] > 0) html += '<span class="cnt">'+callCnt[i][j]+'</span>';
+      td.innerHTML = html;
+    }
+    // m 표
+    for (let i=1;i<=n;i++) for (let j=1;j<=n;j++){
+      const td = cellM(i,j);
+      td.className = traced.has(i+","+j) ? "path" : "";
+    }
+
+    // 현재 단계 강조
+    let target = null;
+    if (st.t === "fill") target = st;
+    if (pending) target = steps[k+1];
+    if (target){
+      const {i,j} = target;
+      cellC(i,j).classList.add("cur");
+      cellM(i,j).classList.add("cur");
+      const up = cellC(i-1,j), left = cellC(i,j-1);
+      up.classList.add("cand"); left.classList.add("cand");
+      if (!pending){
+        const f = from[i][j];
+        if (f==="up"||f==="tie") up.classList.add("pick");
+        if (f==="left"||f==="tie") left.classList.add("pick");
+      }
+      if (pending){
+        const td = cellC(i,j);
+        td.innerHTML = '<input class="ans" id="ans" inputmode="numeric" aria-label="c 값 입력">' + (showCnt ? '<span class="cnt">'+callCnt[i][j]+'</span>' : "");
+        const ans = $("ans");
+        ans.addEventListener("keydown", e => { if (e.key === "Enter"){ e.preventDefault(); checkAnswer(); } e.stopPropagation(); });
+        setTimeout(() => ans.focus(), 0);
+      }
+    }
+    if (st.t === "trace"){
+      const [i,j] = path[st.p];
+      cellC(i,j).classList.add("trace");
+      if (st.p < path.length-1){
+        const [a,b] = path[st.p+1];
+        if (!(i===1||j===1)){ cellC(i-1,j).classList.add("cand"); cellC(i,j-1).classList.add("cand"); }
+        cellC(a,b).classList.add("pick");
+      }
+    }
+
+    renderExplain(st);
+    renderCode(st);
+    $("stepLabel").textContent = "단계 " + k + " / " + (steps.length-1);
+    $("phaseLabel").textContent = {start:"준비", boundary:"① 경계 초기화", fill:"② 표 채우기", trace:"③ 경로 되짚기", done:"완료"}[pending ? "fill" : st.t];
+    $("barFill").style.width = (100*k/(steps.length-1)) + "%";
+    $("btnPrev").disabled = k === 0 && !pending;
+    $("btnReset").disabled = k === 0 && !pending;
+    $("btnNext").disabled = k === steps.length-1;
+    $("btnEnd").disabled = k === steps.length-1;
+    $("btnPlay").disabled = $("quiz").checked || k === steps.length-1;
+  }
+
+  function renderExplain(st){
+    const ex = $("explain");
+    if (pending){
+      const {i,j} = steps[k+1];
+      let s = "<b>직접 계산해 보세요.</b> c["+i+", "+j+"]는 얼마일까요? 노란 칸에 숫자를 넣고 Enter.<br>";
+      s += '<span class="formula">c['+i+', '+j+'] = m<sub>'+i+j+'</sub> + max(c['+(i-1)+', '+j+'], c['+i+', '+(j-1)+']) = ?</span>';
+      if (feedback) s += "<br>" + feedback;
+      ex.innerHTML = s; return;
+    }
+    if (st.t === "start"){
+      ex.innerHTML = "왼쪽 행렬에서 (1, 1)부터 ("+n+", "+n+")까지 오른쪽·아래로만 움직여 합이 가장 큰 경로를 찾습니다.<br>모든 경로를 다 따져 보는 대신, <b>c 표를 왼쪽 위부터 한 칸씩</b> 채웁니다. «다음»을 눌러 시작하세요.";
+    } else if (st.t === "boundary"){
+      ex.innerHTML = "<b>① 경계 초기화</b>: 행렬 밖(0행, 0열)에 이르는 점수는 0으로 둡니다. 행렬 원소가 모두 양수라서, 0인 경계 칸은 항상 다른 선택보다 불리합니다.";
+    } else if (st.t === "fill"){
+      const {i,j} = st, up = C[i-1][j], left = C[i][j-1], m = M[i-1][j-1];
+      const f = from[i][j];
+      let why;
+      if (i===1 && j===1) why = "출발 칸이라 위·왼쪽 모두 경계(0)입니다.";
+      else if (i===1) why = "위쪽은 경계(0)라서 왼쪽에서 오는 수밖에 없습니다.";
+      else if (j===1) why = "왼쪽은 경계(0)라서 위에서 오는 수밖에 없습니다.";
+      else if (f==="up") why = "위에서 오는 쪽("+up+")이 왼쪽("+left+")보다 큽니다.";
+      else if (f==="left") why = "왼쪽에서 오는 쪽("+left+")이 위("+up+")보다 큽니다.";
+      else why = "위와 왼쪽이 "+up+"(으)로 같습니다. 어느 쪽에서 와도 됩니다.";
+      ex.innerHTML = "<b>② c["+i+", "+j+"] 채우기</b> — (i, j)에 오기 직전 칸은 (i-1, j)와 (i, j-1) 둘뿐입니다. "+why+
+        '<br><span class="formula">c['+i+', '+j+'] = m<sub>'+i+j+'</sub> + max(c['+(i-1)+', '+j+'], c['+i+', '+(j-1)+']) = '+m+' + max('+up+', '+left+') = '+m+' + '+Math.max(up,left)+' = <b>'+C[i][j]+'</b></span>' +
+        (feedback ? "<br>"+feedback : "");
+    } else if (st.t === "trace"){
+      const [i,j] = path[st.p];
+      let s = "<b>③ 경로 되짚기</b> — 표만 보면 점수는 알지만 경로는 모릅니다. c["+n+", "+n+"]에서 출발해 위·왼쪽 중 <b>더 큰 칸</b>으로 거꾸로 갑니다.<br>";
+      if (st.p === path.length-1) s += "지금 ("+i+", "+j+") — 출발점에 도착했습니다.";
+      else {
+        const [a,b] = path[st.p+1];
+        if (i===1) s += "지금 ("+i+", "+j+") — 첫 행이라 왼쪽 ("+a+", "+b+")로만 갈 수 있습니다.";
+        else if (j===1) s += "지금 ("+i+", "+j+") — 첫 열이라 위쪽 ("+a+", "+b+")로만 갈 수 있습니다.";
+        else s += "지금 ("+i+", "+j+") — 위 c["+(i-1)+", "+j+"]="+C[i-1][j]+", 왼쪽 c["+i+", "+(j-1)+"]="+C[i][j-1]+" → "+(a===i-1?"위쪽":"왼쪽")+" ("+a+", "+b+")로 갑니다.";
+      }
+      ex.innerHTML = s;
+    } else {
+      const fwd = path.slice().reverse();
+      const vals = fwd.map(([i,j]) => M[i-1][j-1]);
+      ex.innerHTML = '<span class="good">완료!</span> 최고 점수는 <b>c['+n+', '+n+'] = '+C[n][n]+'</b>입니다.<br>' +
+        "최적 경로: " + fwd.map(([i,j]) => "("+i+", "+j+")").join(" → ") +
+        '<br><span class="formula">'+vals.join(" + ")+" = "+vals.reduce((a,b)=>a+b,0)+"</span>";
+    }
+  }
+
+  function renderCode(st){
+    let lines = [];
+    if (pending || st.t === "fill") lines = ["5","6","7"];
+    else if (st.t === "boundary") lines = ["1","2","3","4"];
+    else if (st.t === "trace" || st.t === "done") lines = ["8"];
+    document.querySelectorAll("#code > span").forEach(s => s.classList.toggle("hl", lines.includes(s.dataset.l)));
+  }
+
+  function renderRecursion(){
+    const tot = totalCalls(n);
+    let maxCnt = 0, maxCell = "";
+    for (let i=1;i<=n;i++) for (let j=1;j<=n;j++) if (callCnt[i][j] > maxCnt){ maxCnt = callCnt[i][j]; maxCell = "("+i+", "+j+")"; }
+    $("recText").innerHTML = "지금 "+n+"×"+n+" 행렬을 재귀로 풀면 matrixPath가 <b>"+tot.toLocaleString()+"번</b> 호출되고, 그중 matrixPath"+maxCell+" 하나만 <b>"+maxCnt.toLocaleString()+"번</b> 다시 계산됩니다. DP는 c 표 <b>"+(n*n)+"칸</b>을 한 번씩만 채웁니다.";
+    let h = "<tr><th>n</th><th>재귀 호출 수</th><th>DP 계산 칸 수 (n²)</th></tr>";
+    for (let s=3;s<=12;s++) h += '<tr'+(s===n?' class="now"':'')+"><td>"+s+"</td><td>"+totalCalls(s).toLocaleString()+"</td><td>"+(s*s)+"</td></tr>";
+    $("cmpTbl").innerHTML = h;
+  }
+
+  function checkAnswer(){
+    const ans = $("ans"); if (!ans) return;
+    const {i,j} = steps[k+1];
+    const v = parseInt(ans.value, 10);
+    if (v === C[i][j]){
+      pending = false; k++;
+      feedback = '<span class="good">맞았습니다!</span>';
+      render();
+    } else {
+      const up = C[i-1][j], left = C[i][j-1];
+      let hint;
+      if (isNaN(v)) hint = "숫자를 넣어 주세요.";
+      else if (v === M[i-1][j-1] + Math.min(up,left) && up !== left) hint = "작은 쪽을 고르셨네요. 최고 점수를 구하니까 위·왼쪽 중 <b>큰</b> 값을 더합니다.";
+      else if (v === Math.max(up,left)) hint = "m<sub>"+i+j+"</sub> 값("+M[i-1][j-1]+")을 더하는 것을 잊지 않았나요?";
+      else hint = "위 칸(점선) c["+(i-1)+", "+j+"]와 왼쪽 칸 c["+i+", "+(j-1)+"] 중 큰 값에, 왼쪽 행렬의 노란 칸 값을 더해 보세요.";
+      feedback = '<span class="bad">'+(isNaN(v)?"":v+"은(는) 아닙니다. ")+'</span>'+hint;
+      renderExplain(steps[k]);
+      const a2 = $("ans"); if (a2){ a2.value=""; a2.focus(); }
+    }
+  }
+
+  function next(){
+    if (k >= steps.length-1) return;
+    if (pending){ checkAnswer(); return; }
+    feedback = "";
+    if ($("quiz").checked && steps[k+1].t === "fill"){ pending = true; render(); return; }
+    k++; render();
+  }
+  function prev(){
+    feedback = "";
+    if (pending){ pending = false; render(); return; }
+    if (k > 0){ k--; render(); }
+  }
+  function stop(){ if (timer){ clearInterval(timer); timer = null; } $("btnPlay").textContent = "▶ 자동"; }
+  function play(){
+    if (timer){ stop(); return; }
+    if (k >= steps.length-1) return;
+    $("btnPlay").textContent = "⏸ 멈춤";
+    const tick = () => { if (k >= steps.length-1){ stop(); render(); return; } k++; feedback=""; render(); };
+    tick();
+    timer = setInterval(tick, +$("speed").value);
+  }
+  function restart(rebuild){
+    stop(); pending = false; feedback = ""; k = 0;
+    compute();
+    if (rebuild) buildTables();
+    renderRecursion();
+    render();
+  }
+  function randomMatrix(){
+    M = Array.from({length:n}, () => Array.from({length:n}, () => 1 + Math.floor(Math.random()*20)));
+  }
+
+  $("btnNext").onclick = () => { stop(); next(); };
+  $("btnPrev").onclick = () => { stop(); prev(); };
+  $("btnReset").onclick = () => restart(false);
+  $("btnEnd").onclick = () => { stop(); pending = false; feedback=""; k = steps.length-1; render(); };
+  $("btnPlay").onclick = play;
+  $("speed").oninput = () => { if (timer){ stop(); play(); } };
+  $("btnRandom").onclick = () => { randomMatrix(); restart(true); };
+  $("btnLecture").onclick = () => { n = 4; $("size").value = "4"; M = LECTURE.map(r => r.slice()); restart(true); };
+  $("size").onchange = () => { n = +$("size").value; randomMatrix(); restart(true); };
+  $("quiz").onchange = () => { stop(); pending = false; feedback=""; render(); };
+  $("showArrow").onchange = render;
+  $("showCnt").onchange = render;
+  document.addEventListener("keydown", e => {
+    if (e.target.tagName === "INPUT" && e.target.type !== "checkbox" && e.target.type !== "range") return;
+    if (e.target.tagName === "SELECT") return;
+    if (e.key === "ArrowRight"){ e.preventDefault(); stop(); next(); }
+    else if (e.key === "ArrowLeft"){ e.preventDefault(); stop(); prev(); }
+    else if (e.key === " "){ e.preventDefault(); if (!$("quiz").checked) play(); }
+    else if (e.key === "Home"){ restart(false); }
+    else if (e.key === "End"){ $("btnEnd").click(); }
+  });
+
+  restart(true);
+})();
+</script>
+</body>
+</html>
